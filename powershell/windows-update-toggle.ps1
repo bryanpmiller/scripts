@@ -1,15 +1,21 @@
 <#
 .SYNOPSIS
-    Toggle Windows Automatic Updates On or Off.
+    Toggle Windows Automatic Updates On or Off (Policy + Service).
 
 .DESCRIPTION
-    This script enables or disables Windows Automatic Updates
-    by modifying the following registry key:
+    Off:
+        - Sets NoAutoUpdate = 1
+        - Stops wuauserv
+        - Sets wuauserv StartupType to Disabled
 
-    HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU
+    On:
+        - Removes NoAutoUpdate
+        - Sets wuauserv StartupType to Manual
+        - Starts wuauserv
 
-    -Mode Off  → Disables Automatic Updates
-    -Mode On   → Enables Automatic Updates
+.NOTES
+    Must be run as Administrator.
+
 
 .USAGE
     Run PowerShell as Administrator.
@@ -23,7 +29,7 @@
 
 $Mode = "Off"   # Change to "On" or "Off"
 
-# Ensure script is run as Administrator
+# Admin check
 if (-not ([Security.Principal.WindowsPrincipal] `
     [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(`
     [Security.Principal.WindowsBuiltinRole]::Administrator)) {
@@ -33,8 +39,8 @@ if (-not ([Security.Principal.WindowsPrincipal] `
 }
 
 $path = "HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU"
+$name = "NoAutoUpdate"
 
-# Ensure registry path exists
 if (-not (Test-Path $path)) {
     New-Item -Path $path -Force | Out-Null
 }
@@ -42,20 +48,42 @@ if (-not (Test-Path $path)) {
 switch ($Mode) {
 
     "Off" {
-        New-ItemProperty -Path $path `
-            -Name "NoAutoUpdate" `
-            -Value 1 `
-            -PropertyType DWord `
-            -Force | Out-Null
+        Write-Host "Disabling Windows Updates..." -ForegroundColor Yellow
 
-        Write-Host "Windows Automatic Updates have been DISABLED." -ForegroundColor Yellow
+        # Policy
+        New-ItemProperty -Path $path -Name $name -Value 1 -PropertyType DWord -Force | Out-Null
+
+        # Service
+        Stop-Service wuauserv -Force -ErrorAction SilentlyContinue
+        Set-Service wuauserv -StartupType Disabled
     }
 
     "On" {
-        Remove-ItemProperty -Path $path `
-            -Name "NoAutoUpdate" `
-            -ErrorAction SilentlyContinue
+        Write-Host "Enabling Windows Updates..." -ForegroundColor Green
 
-        Write-Host "Windows Automatic Updates have been ENABLED." -ForegroundColor Green
+        # Policy
+        Remove-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue
+
+        # Service
+        Set-Service wuauserv -StartupType Manual
+        Start-Service wuauserv -ErrorAction SilentlyContinue
     }
 }
+
+# ---- VERIFICATION ----
+
+$policyState = if ((Get-ItemProperty -Path $path -Name $name -ErrorAction SilentlyContinue).$name -eq 1) {
+    "Disabled"
+} else {
+    "Enabled"
+}
+
+$service = Get-Service wuauserv
+$serviceState = $service.Status
+$startupType = (Get-CimInstance Win32_Service -Filter "Name='wuauserv'").StartMode
+
+Write-Host "`n==== Verification ====" -ForegroundColor Cyan
+Write-Host "Policy State  : $policyState"
+Write-Host "Service State : $serviceState"
+Write-Host "Startup Type  : $startupType"
+Write-Host "=======================" -ForegroundColor Cyan
