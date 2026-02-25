@@ -19,7 +19,8 @@
 .USAGE
     Set [$secureEnvironment = $true] to secure the system
     Example syntax:
-    PS C:\> .\toggle-cipher-suites.ps1 
+    PS C:\> .\[filename].ps1 
+
 #>
 
 
