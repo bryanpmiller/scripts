@@ -20,7 +20,8 @@
 
 .USAGE
     Example syntax:
-    PS C:\> .\remediation-wireshark-uninstall.ps1 
+    PS C:\> .\[filename].ps1 
+
 #>
  
  # Define the variables
