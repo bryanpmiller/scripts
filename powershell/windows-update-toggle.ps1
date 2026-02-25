@@ -15,17 +15,13 @@
     Run PowerShell as Administrator.
 
     Disable Updates:
-        .\windows-update-toggle.ps1 -Mode Off
+        $Mode = "Off"
 
     Enable Updates:
-        .\windows-update-toggle.ps1 -Mode On
+        $Mode = "On"
 #>
 
-param (
-    [Parameter(Mandatory=$true)]
-    [ValidateSet("On","Off")]
-    [string]$Mode
-)
+$Mode = "Off"   # Change to "On" or "Off"
 
 # Ensure script is run as Administrator
 if (-not ([Security.Principal.WindowsPrincipal] `
