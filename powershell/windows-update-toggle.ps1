@@ -87,3 +87,5 @@ Write-Host "Policy State  : $policyState"
 Write-Host "Service State : $serviceState"
 Write-Host "Startup Type  : $startupType"
 Write-Host "=======================" -ForegroundColor Cyan
+
+Get-Service -Name wuauserv
