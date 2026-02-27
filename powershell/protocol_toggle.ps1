@@ -10,20 +10,26 @@
     Last Modified : 2024-09-09
     Version       : 1.0
 
-.TESTED ON
+.EDITED BY
+    Date(s) Edited : 2025-02-27
+    Edited By      : Bryan Miller
+    Changes Made   : modifed envionment variable to toggle between secure and insecure settings
+    Tested         : No
+
+    .TESTED ON
     Date(s) Tested  : 2024-09-09
     Tested By       : Josh Madakor
     Systems Tested  : Windows Server 2019 Datacenter, Build 1809
     PowerShell Ver. : 5.1.17763.6189
 
 .USAGE
-    Set [$makeSecure = $true] to secure the system
+    Set [$secureEnvironment = $true] to secure the system
     Example syntax:
     PS C:\> .\[filename].ps1 
 #>
  
 # Variable to determine if we want to make the computer secure or insecure
-$makeSecure = $true
+$secureEnvironment = $true
 
 # Check if the script is run as Administrator
 function Check-Admin {
@@ -42,7 +48,7 @@ if (-not (Check-Admin)) {
 $serverPathSSL2 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 2.0\Server"
 $clientPathSSL2 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 2.0\Client"
 
-if ($makeSecure) {
+if ($secureEnvironment) {
     New-Item -Path $serverPathSSL2 -Force | Out-Null
     New-ItemProperty -Path $serverPathSSL2 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
     New-ItemProperty -Path $serverPathSSL2 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
@@ -68,7 +74,7 @@ if ($makeSecure) {
 $serverPathSSL3 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 3.0\Server"
 $clientPathSSL3 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 3.0\Client"
 
-if ($makeSecure) {
+if ($secureEnvironment) {
     New-Item -Path $serverPathSSL3 -Force | Out-Null
     New-ItemProperty -Path $serverPathSSL3 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
     New-ItemProperty -Path $serverPathSSL3 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
@@ -94,7 +100,7 @@ if ($makeSecure) {
 $serverPathTLS10 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.0\Server"
 $clientPathTLS10 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.0\Client"
 
-if ($makeSecure) {
+if ($secureEnvironment) {
     New-Item -Path $serverPathTLS10 -Force | Out-Null
     New-ItemProperty -Path $serverPathTLS10 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
     New-ItemProperty -Path $serverPathTLS10 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
@@ -120,7 +126,7 @@ if ($makeSecure) {
 $serverPathTLS11 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.1\Server"
 $clientPathTLS11 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.1\Client"
 
-if ($makeSecure) {
+if ($secureEnvironment) {
     New-Item -Path $serverPathTLS11 -Force | Out-Null
     New-ItemProperty -Path $serverPathTLS11 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
     New-ItemProperty -Path $serverPathTLS11 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
@@ -146,7 +152,7 @@ if ($makeSecure) {
 $serverPathTLS12 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Server"
 $clientPathTLS12 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client"
 
-if ($makeSecure) {
+if ($secureEnvironment) {
     New-Item -Path $serverPathTLS12 -Force | Out-Null
     New-ItemProperty -Path $serverPathTLS12 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
     New-ItemProperty -Path $serverPathTLS12 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
