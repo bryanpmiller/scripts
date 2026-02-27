@@ -3,8 +3,12 @@
     Interactive manager for toggling security settings and uninstalling Wireshark.
 
 .DESCRIPTION
-    This script combines three existing helpers into a single interactive tool.  For each
-    of the toggle scripts (protocols and cipher suites) the user is prompted whether to run
+    This script combines three existing helpers into a single interactive tool. 
+        - Protocol Toggle: Enables or disables SSL/TLS protocols based on user choice.
+        - Cipher Suites Toggle: Configures the system's cipher suites to a secure or insecure set based on user choice.
+        - Wireshark Uninstaller: Offers the option to uninstall Wireshark if it is installed.
+    
+    For each of the toggle scripts (protocols and cipher suites) the user is prompted whether to run
     it and, if so, whether to configure the machine in a "secure" or "insecure" state.
     The Wireshark uninstaller can be run independently.
 
@@ -227,7 +231,7 @@ if (-not (Check-Admin)) {
 }
 
 $tasks = @(
-    @{ Name='Protocol Toggle'; Action={ $secure = Prompt-SecureChoice -Name 'protocols'; Set-ProtocolSecurity -secureEnvironment $secure } },
+    @{ Name='Protocol Toggle (TLS & CLS)'; Action={ $secure = Prompt-SecureChoice -Name 'protocols'; Set-ProtocolSecurity -secureEnvironment $secure } },
     @{ Name='Cipher Suites Toggle'; Action={ $secure = Prompt-SecureChoice -Name 'cipher suites'; Set-CipherSuites -secureEnvironment $secure } },
     @{ Name='Wireshark Uninstall'; Action={ if (Prompt-YesNo 'Do you want to uninstall Wireshark?') { Uninstall-Wireshark } } }
 )
