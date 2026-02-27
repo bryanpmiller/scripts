@@ -10,17 +10,17 @@
     Last Modified : 2024-09-09
     Version       : 1.0
 
+.TESTED ON
+    Date(s) Tested  : 2024-09-09
+    Tested By       : Josh Madakor
+    Systems Tested  : Windows Server 2019 Datacenter, Build 1809
+    PowerShell Ver. : 5.1.17763.6189
+
 .EDITED BY
     Date(s) Edited : 2025-02-27
     Edited By      : Bryan Miller
     Changes Made   : modifed envionment variable to toggle between secure and insecure settings
     Tested         : No
-
-    .TESTED ON
-    Date(s) Tested  : 2024-09-09
-    Tested By       : Josh Madakor
-    Systems Tested  : Windows Server 2019 Datacenter, Build 1809
-    PowerShell Ver. : 5.1.17763.6189
 
 .USAGE
     Set [$secureEnvironment = $true] to secure the system
