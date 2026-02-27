@@ -17,7 +17,7 @@
     PowerShell Ver. : 5.1.17763.6189
 
 .EDITED BY
-    Date(s) Edited : 2025-02-27
+    Date(s) Edited : 2026-02-27
     Edited By      : Bryan Miller
     Changes Made   : modifed envionment variable to toggle between secure and insecure settings
     Tested         : No
