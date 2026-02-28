@@ -20,7 +20,7 @@
     Date(s) Edited : 2026-02-27
     Edited By      : Bryan Miller
     Changes Made   : modifed envionment variable to toggle between secure and insecure settings
-    Tested         : No
+    Tested         : Yes
 
 .USAGE
     Set [$secureEnvironment = $true] to secure the system
