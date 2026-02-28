@@ -3,12 +3,13 @@
     Interactive manager for toggling security settings and uninstalling Wireshark.
 
 .DESCRIPTION
-    This script combines three existing helpers into a single interactive tool. 
+    This script combines four existing helpers into a single interactive tool. 
         - Protocol Toggle: Enables or disables SSL/TLS protocols based on user choice.
         - Cipher Suites Toggle: Configures the system's cipher suites to a secure or insecure set based on user choice.
         - Wireshark Uninstaller: Offers the option to uninstall Wireshark if it is installed.
+        - Admin/Guest Account Toggle: Toggles local Administrator/Guest behavior for lab-style scenarios.
     
-    For each of the toggle scripts (protocols and cipher suites) the user is prompted whether to run
+    For each of the toggle scripts (protocols, cipher suites, and admin/guest accounts) the user is prompted whether to run
     it and, if so, whether to configure the machine in a "secure" or "insecure" state.
     The Wireshark uninstaller can be run independently.
 
@@ -217,6 +218,265 @@ function Uninstall-Wireshark {
     }
 }
 
+# admin/guest account toggle logic (secure = Off, insecure = On)
+function Set-AdminGuestAccounts {
+    param(
+        [bool]$secureEnvironment
+    )
+
+    $toggle = if ($secureEnvironment) { "Off" } else { "On" }
+    $administratorPasswordPlain = ""
+    $guestPasswordPlain = ""
+
+    function Add-ReportLine {
+        param([ref]$Report, [string]$Text)
+        $Report.Value += $Text
+    }
+
+    function Try-ReportStep {
+        param([ref]$Report, [string]$Label, [scriptblock]$Action)
+
+        try {
+            & $Action
+            Add-ReportLine -Report $Report -Text "[OK] $Label"
+            return $true
+        } catch {
+            Add-ReportLine -Report $Report -Text "[FAIL] $Label - $($_.Exception.Message)"
+            return $false
+        }
+    }
+
+    function Get-AdministratorsGroupName {
+        $group = Get-LocalGroup | Where-Object { $_.SID.Value -match '-544$' } | Select-Object -First 1
+        if (-not $group) { throw "Could not find local Administrators group (SID ...-544)." }
+        return $group.Name
+    }
+
+    function Test-IsBuiltInAdministrator {
+        param([string]$Name)
+
+        try {
+            $user = Get-LocalUser -Name $Name -ErrorAction Stop
+            return ($user.SID.Value -match '-500$')
+        } catch {
+            return $false
+        }
+    }
+
+    function Ensure-UserByName {
+        param(
+            [string]$Name,
+            [string]$PasswordPlain,
+            [string]$AdminsGroupName,
+            [ref]$Report
+        )
+
+        $user = Get-LocalUser -Name $Name -ErrorAction SilentlyContinue
+
+        if (-not $user) {
+            Add-ReportLine -Report $Report -Text "[INFO] $Name account did not exist."
+
+            if ([string]::IsNullOrEmpty($PasswordPlain)) {
+                Try-ReportStep -Report $Report -Label "Created $Name account with no password." -Action {
+                    New-LocalUser -Name $Name -NoPassword -Description "$Name (created by script)" | Out-Null
+                } | Out-Null
+            } else {
+                $securePassword = ConvertTo-SecureString $PasswordPlain -AsPlainText -Force
+                Try-ReportStep -Report $Report -Label "Created $Name account (password set)." -Action {
+                    New-LocalUser -Name $Name -Password $securePassword -Description "$Name (created by script)" | Out-Null
+                } | Out-Null
+            }
+
+            $user = Get-LocalUser -Name $Name -ErrorAction SilentlyContinue
+            if (-not $user) {
+                Add-ReportLine -Report $Report -Text "[FAIL] $Name still not present after creation attempt."
+                return
+            }
+        } else {
+            Add-ReportLine -Report $Report -Text "[INFO] $Name account exists."
+        }
+
+        $user = Get-LocalUser -Name $Name -ErrorAction SilentlyContinue
+        if ($user.Enabled) {
+            Add-ReportLine -Report $Report -Text "[OK] $Name already enabled."
+        } else {
+            Try-ReportStep -Report $Report -Label "Enabled $Name (Enable-LocalUser)." -Action {
+                Enable-LocalUser -Name $Name
+            } | Out-Null
+
+            $user = Get-LocalUser -Name $Name -ErrorAction SilentlyContinue
+            if (-not $user.Enabled) {
+                Try-ReportStep -Report $Report -Label "Enabled $Name (net user /active:yes fallback)." -Action {
+                    cmd.exe /c "net user `"$Name`" /active:yes" | Out-Null
+                } | Out-Null
+            }
+
+            $user = Get-LocalUser -Name $Name -ErrorAction SilentlyContinue
+            if ($user.Enabled) {
+                Add-ReportLine -Report $Report -Text "[OK] $Name enabled (verified)."
+            } else {
+                Add-ReportLine -Report $Report -Text "[FAIL] $Name still disabled after attempts (likely Local Security Policy/GPO)."
+            }
+        }
+
+        if ([string]::IsNullOrEmpty($PasswordPlain)) {
+            Try-ReportStep -Report $Report -Label "Set password to (none)." -Action {
+                cmd.exe /c "net user `"$Name`" `"`"" | Out-Null
+            } | Out-Null
+        } else {
+            $securePassword2 = ConvertTo-SecureString $PasswordPlain -AsPlainText -Force
+            Try-ReportStep -Report $Report -Label "Set password to (password set)." -Action {
+                Set-LocalUser -Name $Name -Password $securePassword2
+            } | Out-Null
+        }
+
+        Try-ReportStep -Report $Report -Label "Add to '$AdminsGroupName' (Add-LocalGroupMember)." -Action {
+            Add-LocalGroupMember -Group $AdminsGroupName -Member $Name -ErrorAction Stop
+        } | Out-Null
+
+        $isMember = $false
+        try {
+            $members = Get-LocalGroupMember -Group $AdminsGroupName -ErrorAction Stop
+            $isMember = $members.Name -match "(^|\\)$([regex]::Escape($Name))$"
+        } catch { }
+
+        if (-not $isMember) {
+            Try-ReportStep -Report $Report -Label "Add to '$AdminsGroupName' (net localgroup fallback)." -Action {
+                cmd.exe /c "net localgroup `"$AdminsGroupName`" `"$Name`" /add" | Out-Null
+            } | Out-Null
+        }
+
+        $isMember = $false
+        try {
+            $members = Get-LocalGroupMember -Group $AdminsGroupName -ErrorAction Stop
+            $isMember = $members.Name -match "(^|\\)$([regex]::Escape($Name))$"
+        } catch { }
+
+        if ($isMember) {
+            Add-ReportLine -Report $Report -Text "[OK] $Name is in '$AdminsGroupName' (verified)."
+        } else {
+            Add-ReportLine -Report $Report -Text "[FAIL] $Name is NOT in '$AdminsGroupName' after attempts."
+        }
+    }
+
+    function Remove-UserByNameIfSafe {
+        param(
+            [string]$Name,
+            [ref]$Report
+        )
+
+        $user = Get-LocalUser -Name $Name -ErrorAction SilentlyContinue
+        if (-not $user) {
+            Add-ReportLine -Report $Report -Text "[INFO] $Name does not exist (nothing to delete)."
+            return
+        }
+
+        if (Test-IsBuiltInAdministrator -Name $Name) {
+            Add-ReportLine -Report $Report -Text "[WARN] $Name is the built-in Administrator (RID 500). Skipping delete for safety/compatibility."
+            return
+        }
+
+        Try-ReportStep -Report $Report -Label "Deleted local user '$Name'." -Action {
+            Remove-LocalUser -Name $Name -ErrorAction Stop
+        } | Out-Null
+    }
+
+    function Remove-From-Admins {
+        param(
+            [string]$Name,
+            [string]$AdminsGroupName,
+            [ref]$Report
+        )
+
+        Try-ReportStep -Report $Report -Label "Remove '$Name' from '$AdminsGroupName' (Remove-LocalGroupMember)." -Action {
+            Remove-LocalGroupMember -Group $AdminsGroupName -Member $Name -ErrorAction Stop
+        } | Out-Null
+
+        Try-ReportStep -Report $Report -Label "Remove '$Name' from '$AdminsGroupName' (net localgroup fallback)." -Action {
+            cmd.exe /c "net localgroup `"$AdminsGroupName`" `"$Name`" /delete" | Out-Null
+        } | Out-Null
+    }
+
+    function Disable-UserByName {
+        param(
+            [string]$Name,
+            [ref]$Report
+        )
+
+        $user = Get-LocalUser -Name $Name -ErrorAction SilentlyContinue
+        if (-not $user) {
+            Add-ReportLine -Report $Report -Text "[INFO] $Name does not exist (nothing to disable)."
+            return
+        }
+
+        if (-not $user.Enabled) {
+            Add-ReportLine -Report $Report -Text "[OK] $Name already disabled."
+            return
+        }
+
+        Try-ReportStep -Report $Report -Label "Disabled $Name (Disable-LocalUser)." -Action {
+            Disable-LocalUser -Name $Name
+        } | Out-Null
+
+        $user = Get-LocalUser -Name $Name -ErrorAction SilentlyContinue
+        if ($user.Enabled) {
+            Try-ReportStep -Report $Report -Label "Disabled $Name (net user /active:no fallback)." -Action {
+                cmd.exe /c "net user `"$Name`" /active:no" | Out-Null
+            } | Out-Null
+        }
+
+        $user = Get-LocalUser -Name $Name -ErrorAction SilentlyContinue
+        if (-not $user.Enabled) {
+            Add-ReportLine -Report $Report -Text "[OK] $Name disabled (verified)."
+        } else {
+            Add-ReportLine -Report $Report -Text "[FAIL] $Name still enabled after attempts (likely Local Security Policy/GPO)."
+        }
+    }
+
+    $limitBlank = (Get-ItemProperty "HKLM:\SYSTEM\CurrentControlSet\Control\Lsa" -Name LimitBlankPasswordUse -ErrorAction SilentlyContinue).LimitBlankPasswordUse
+    $policyNote = if ($null -eq $limitBlank) {
+        "LimitBlankPasswordUse not found (policy may still exist elsewhere)."
+    } else {
+        "LimitBlankPasswordUse = $limitBlank (1 = blank passwords restricted)."
+    }
+
+    $adminsGroupName = Get-AdministratorsGroupName
+    $adminReport = @()
+    $guestReport = @()
+
+    if ($toggle -eq "On") {
+        Ensure-UserByName -Name "Administrator" -PasswordPlain $administratorPasswordPlain -AdminsGroupName $adminsGroupName -Report ([ref]$adminReport)
+        Ensure-UserByName -Name "Guest" -PasswordPlain $guestPasswordPlain -AdminsGroupName $adminsGroupName -Report ([ref]$guestReport)
+    } elseif ($toggle -eq "Off") {
+        Remove-UserByNameIfSafe -Name "Administrator" -Report ([ref]$adminReport)
+        Remove-From-Admins -Name "Guest" -AdminsGroupName $adminsGroupName -Report ([ref]$guestReport)
+        Disable-UserByName -Name "Guest" -Report ([ref]$guestReport)
+    } else {
+        throw "Invalid toggle value: '$toggle'."
+    }
+
+    Write-Host "`n==================== ADMIN/GUEST SUMMARY ====================" -ForegroundColor Yellow
+    Write-Host $policyNote -ForegroundColor DarkYellow
+    Write-Host "Administrators group resolved as: '$adminsGroupName'" -ForegroundColor DarkYellow
+    Write-Host "Toggle mode: $toggle (secure maps to Off, insecure maps to On)" -ForegroundColor DarkYellow
+
+    Write-Host "`n--- Administrator ---" -ForegroundColor Cyan
+    $adminReport | ForEach-Object { Write-Host $_ }
+
+    Write-Host "`n--- Guest ---" -ForegroundColor Cyan
+    $guestReport | ForEach-Object { Write-Host $_ }
+
+    Write-Host "`n--- Verification: Users ---" -ForegroundColor Yellow
+    Get-LocalUser -Name "Administrator","Guest" -ErrorAction SilentlyContinue |
+        Select-Object Name, Enabled, PasswordRequired, PasswordExpires, LastLogon, SID |
+        Format-Table -AutoSize
+
+    Write-Host "`n--- Verification: '$adminsGroupName' Members (filtered) ---" -ForegroundColor Yellow
+    Get-LocalGroupMember -Group $adminsGroupName -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match "(^|\\)Administrator$" -or $_.Name -match "(^|\\)Guest$" } |
+        Format-Table -AutoSize
+}
+
 # utility prompting helpers
 function Request-YesNo {
     param(
@@ -254,6 +514,7 @@ if (-not (Test-Admin)) {
 $tasks = @(
     @{ Name='Protocol Toggle (TLS & CLS)'; Action={ $secure = Request-SecureChoice -Name 'protocols'; Set-ProtocolSecurity -secureEnvironment $secure } },
     @{ Name='Cipher Suites Toggle'; Action={ $secure = Request-SecureChoice -Name 'cipher suites'; Set-CipherSuites -secureEnvironment $secure } },
+    @{ Name='Admin/Guest Account Toggle'; Action={ $secure = Request-SecureChoice -Name 'admin/guest accounts'; Set-AdminGuestAccounts -secureEnvironment $secure } },
     @{ Name='Wireshark Uninstall'; Action={ if (Request-YesNo 'Do you want to uninstall Wireshark?') { Uninstall-Wireshark } } }
 )
 
