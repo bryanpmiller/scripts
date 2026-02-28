@@ -27,32 +27,60 @@ function Test-Admin {
     return $principal.IsInRole([System.Security.Principal.WindowsBuiltInRole]::Administrator)
 }
 
+# generic helper used by the protocol and cipher routines - writes a dword and verifies it
+function Set-RegistryDword {
+    param(
+        [string]$Path,
+        [string]$Name,
+        [int]$Value
+    )
+    New-Item -Path $Path -Force | Out-Null
+    New-ItemProperty -Path $Path -Name $Name -Value $Value -PropertyType 'DWord' -Force | Out-Null
+    return (Get-ItemProperty -Path $Path -Name $Name).$Name -eq $Value
+}
+
 # protocol toggle logic extracted from protocol_toggle.ps1, parameterized
 function Set-ProtocolSecurity {
     param(
         [bool]$secureEnvironment
     )
 
+    # helper routines inside this function to keep callers simple
+    function Apply-ProtocolValue {
+        param($Path,$Name,$Value)
+        return Set-RegistryDword -Path $Path -Name $Name -Value $Value
+    }
+
+    function Configure-Protocol {
+        param(
+            [string]$ServerPath,
+            [string]$ClientPath,
+            [int]$EnabledValue,
+            [int]$DisabledByDefaultValue
+        )
+        $s1 = Apply-ProtocolValue -Path $ServerPath -Name 'Enabled' -Value $EnabledValue
+        $s2 = Apply-ProtocolValue -Path $ServerPath -Name 'DisabledByDefault' -Value $DisabledByDefaultValue
+        $s3 = Apply-ProtocolValue -Path $ClientPath -Name 'Enabled' -Value $EnabledValue
+        $s4 = Apply-ProtocolValue -Path $ClientPath -Name 'DisabledByDefault' -Value $DisabledByDefaultValue
+        return ($s1 -and $s2 -and $s3 -and $s4)
+    }
+
     # SSL 2.0 paths
     $serverPathSSL2 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 2.0\Server"
     $clientPathSSL2 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 2.0\Client"
 
     if ($secureEnvironment) {
-        New-Item -Path $serverPathSSL2 -Force | Out-Null
-        New-ItemProperty -Path $serverPathSSL2 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $serverPathSSL2 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-Item -Path $clientPathSSL2 -Force | Out-Null
-        New-ItemProperty -Path $clientPathSSL2 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $clientPathSSL2 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        Write-Host "SSL 2.0 has been disabled."
+        if (Configure-Protocol -ServerPath $serverPathSSL2 -ClientPath $clientPathSSL2 -EnabledValue 0 -DisabledByDefaultValue 1) {
+            Write-Host "SSL 2.0 has been disabled."
+        } else {
+            Write-Warning "Failed to disable SSL 2.0; registry values may not match expected."
+        }
     } else {
-        New-Item -Path $serverPathSSL2 -Force | Out-Null
-        New-ItemProperty -Path $serverPathSSL2 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $serverPathSSL2 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-Item -Path $clientPathSSL2 -Force | Out-Null
-        New-ItemProperty -Path $clientPathSSL2 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $clientPathSSL2 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        Write-Host "SSL 2.0 has been enabled."
+        if (Configure-Protocol -ServerPath $serverPathSSL2 -ClientPath $clientPathSSL2 -EnabledValue 1 -DisabledByDefaultValue 0) {
+            Write-Host "SSL 2.0 has been enabled."
+        } else {
+            Write-Warning "Failed to enable SSL 2.0; registry values may not match expected."
+        }
     }
 
     # SSL 3.0
@@ -60,21 +88,17 @@ function Set-ProtocolSecurity {
     $clientPathSSL3 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\SSL 3.0\Client"
 
     if ($secureEnvironment) {
-        New-Item -Path $serverPathSSL3 -Force | Out-Null
-        New-ItemProperty -Path $serverPathSSL3 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $serverPathSSL3 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-Item -Path $clientPathSSL3 -Force | Out-Null
-        New-ItemProperty -Path $clientPathSSL3 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $clientPathSSL3 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        Write-Host "SSL 3.0 has been disabled."
+        if (Configure-Protocol -ServerPath $serverPathSSL3 -ClientPath $clientPathSSL3 -EnabledValue 0 -DisabledByDefaultValue 1) {
+            Write-Host "SSL 3.0 has been disabled."
+        } else {
+            Write-Warning "Failed to disable SSL 3.0; registry values may not match expected."
+        }
     } else {
-        New-Item -Path $serverPathSSL3 -Force | Out-Null
-        New-ItemProperty -Path $serverPathSSL3 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $serverPathSSL3 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-Item -Path $clientPathSSL3 -Force | Out-Null
-        New-ItemProperty -Path $clientPathSSL3 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $clientPathSSL3 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        Write-Host "SSL 3.0 has been enabled."
+        if (Configure-Protocol -ServerPath $serverPathSSL3 -ClientPath $clientPathSSL3 -EnabledValue 1 -DisabledByDefaultValue 0) {
+            Write-Host "SSL 3.0 has been enabled."
+        } else {
+            Write-Warning "Failed to enable SSL 3.0; registry values may not match expected."
+        }
     }
 
     # TLS 1.0
@@ -82,21 +106,17 @@ function Set-ProtocolSecurity {
     $clientPathTLS10 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.0\Client"
 
     if ($secureEnvironment) {
-        New-Item -Path $serverPathTLS10 -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS10 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS10 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-Item -Path $clientPathTLS10 -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS10 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS10 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        Write-Host "TLS 1.0 has been disabled."
+        if (Configure-Protocol -ServerPath $serverPathTLS10 -ClientPath $clientPathTLS10 -EnabledValue 0 -DisabledByDefaultValue 1) {
+            Write-Host "TLS 1.0 has been disabled."
+        } else {
+            Write-Warning "Failed to disable TLS 1.0; registry values may not match expected."
+        }
     } else {
-        New-Item -Path $serverPathTLS10 -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS10 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS10 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-Item -Path $clientPathTLS10 -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS10 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS10 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        Write-Host "TLS 1.0 has been enabled."
+        if (Configure-Protocol -ServerPath $serverPathTLS10 -ClientPath $clientPathTLS10 -EnabledValue 1 -DisabledByDefaultValue 0) {
+            Write-Host "TLS 1.0 has been enabled."
+        } else {
+            Write-Warning "Failed to enable TLS 1.0; registry values may not match expected."
+        }
     }
 
     # TLS 1.1
@@ -104,21 +124,17 @@ function Set-ProtocolSecurity {
     $clientPathTLS11 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.1\Client"
 
     if ($secureEnvironment) {
-        New-Item -Path $serverPathTLS11 -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS11 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS11 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-Item -Path $clientPathTLS11 -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS11 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS11 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        Write-Host "TLS 1.1 has been disabled."
+        if (Configure-Protocol -ServerPath $serverPathTLS11 -ClientPath $clientPathTLS11 -EnabledValue 0 -DisabledByDefaultValue 1) {
+            Write-Host "TLS 1.1 has been disabled."
+        } else {
+            Write-Warning "Failed to disable TLS 1.1; registry values may not match expected."
+        }
     } else {
-        New-Item -Path $serverPathTLS11 -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS11 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS11 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-Item -Path $clientPathTLS11 -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS11 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS11 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        Write-Host "TLS 1.1 has been enabled."
+        if (Configure-Protocol -ServerPath $serverPathTLS11 -ClientPath $clientPathTLS11 -EnabledValue 1 -DisabledByDefaultValue 0) {
+            Write-Host "TLS 1.1 has been enabled."
+        } else {
+            Write-Warning "Failed to enable TLS 1.1; registry values may not match expected."
+        }
     }
 
     # TLS 1.2
@@ -126,21 +142,17 @@ function Set-ProtocolSecurity {
     $clientPathTLS12 = "HKLM:\SYSTEM\CurrentControlSet\Control\SecurityProviders\SCHANNEL\Protocols\TLS 1.2\Client"
 
     if ($secureEnvironment) {
-        New-Item -Path $serverPathTLS12 -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS12 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS12 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-Item -Path $clientPathTLS12 -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS12 -Name 'Enabled' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS12 -Name 'DisabledByDefault' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        Write-Host "TLS 1.2 has been enabled."
+        if (Configure-Protocol -ServerPath $serverPathTLS12 -ClientPath $clientPathTLS12 -EnabledValue 1 -DisabledByDefaultValue 0) {
+            Write-Host "TLS 1.2 has been enabled."
+        } else {
+            Write-Warning "Failed to enable TLS 1.2; registry values may not match expected."
+        }
     } else {
-        New-Item -Path $serverPathTLS12 -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS12 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $serverPathTLS12 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        New-Item -Path $clientPathTLS12 -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS12 -Name 'Enabled' -Value 0 -PropertyType 'DWord' -Force | Out-Null
-        New-ItemProperty -Path $clientPathTLS12 -Name 'DisabledByDefault' -Value 1 -PropertyType 'DWord' -Force | Out-Null
-        Write-Host "TLS 1.2 has been disabled."
+        if (Configure-Protocol -ServerPath $serverPathTLS12 -ClientPath $clientPathTLS12 -EnabledValue 0 -DisabledByDefaultValue 1) {
+            Write-Host "TLS 1.2 has been disabled."
+        } else {
+            Write-Warning "Failed to disable TLS 1.2; registry values may not match expected."
+        }
     }
 
     Write-Host "Please reboot for settings to take effect."
@@ -172,8 +184,17 @@ function Set-CipherSuites {
     Set-ItemProperty -Path $regPath -Name "Functions" -Value $selectedCipherSuites
     Set-ItemProperty -Path $regPath -Name "Enabled" -Value 1
 
-    Write-Output "Cipher Suites have been updated to:" 
-    Get-ItemProperty -Path $regPath -Name "Functions" | Select-Object -ExpandProperty Functions
+    # read back the value and display it for confirmation
+    $actual = (Get-ItemProperty -Path $regPath -Name "Functions").Functions
+    Write-Output "Cipher Suites have been updated to:"
+    Write-Output $actual
+
+    if ($actual -eq $selectedCipherSuites) {
+        Write-Output "Verification successful: registry contains the expected list."
+    } else {
+        Write-Warning "Verification failed: registry value does not match selection."
+    }
+
     Write-Output "Please restart the server to apply the changes."
 }
 

@@ -16,6 +16,12 @@
     Systems Tested  : Windows Server 2019 Datacenter, Build 1809
     PowerShell Ver. : 5.1.17763.6189
 
+.EDITED BY
+    Date(s) Edited : 2026-02-27
+    Edited By      : Bryan Miller
+    Changes Made   : modifed envionment variable to toggle between secure and insecure settings
+    Tested         : No
+
 .USAGE
     Set [$secureEnvironment = $true] to secure the system
     Example syntax:
@@ -66,8 +72,15 @@ if (-not (Test-Path "$policyPath\$policyKey")) {
 Set-ItemProperty -Path "$policyPath\$policyKey" -Name $policyName -Value $selectedCipherSuites
 
 # Verify the changes
+$actual = (Get-ItemProperty -Path $regPath -Name "Functions").Functions
 Write-Output "Cipher Suites have been updated to:"
-Get-ItemProperty -Path $regPath -Name "Functions" | Select-Object -ExpandProperty Functions
+Write-Output $actual
+
+if ($actual -eq $selectedCipherSuites) {
+    Write-Output "Verification succeeded: registry contains expected cipher list."
+} else {
+    Write-Warning "Verification failed: registry value does not match desired selection."
+}
 
 # Enable SSL Cipher Suite Order policy
 Set-ItemProperty -Path "HKLM:\SOFTWARE\Policies\Microsoft\Cryptography\Configuration\SSL\00010002" -Name "Enabled" -Value 1
