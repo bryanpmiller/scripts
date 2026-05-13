@@ -1,0 +1,9 @@
+# This allows you to ping a remote device from a specific Machine. Example: Ping an Azure VM w/ a public IP from your personal machine/vm.
+# Ensure you set "YOUR_PUBLIC_IP" on line 9 to your desired public IP address.
+
+New-NetFirewallRule -DisplayName "Allow ICMPv4-In From Home" `
+  -Protocol ICMPv4 `
+  -IcmpType 8 `
+  -Direction Inbound `
+  -Action Allow `
+  -RemoteAddress YOUR_PUBLIC_IP
