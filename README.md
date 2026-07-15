@@ -17,6 +17,7 @@ scripts/
     manage_toggles.ps1
     openfirewall.ps1
     protocol_toggle.ps1
+    rdp_public_ip_restriction.ps1
     teams_remove_tool.ps1
     updated_libcurl.ps1
     windows-update-toggle.ps1
