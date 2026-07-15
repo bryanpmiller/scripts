@@ -63,6 +63,7 @@ chmod +x scripts/bash/<script-name>.sh
 | `powershell/manage_toggles.ps1` | Interactive manager that combines multiple lab toggles and cleanup actions. | Prompts the user to run protocol toggles, cipher suite toggles, Admin/Guest account toggles, and Wireshark removal. Secure mode hardens protocols/ciphers and turns Admin/Guest lab settings off; insecure mode enables weaker lab settings. Requires Administrator privileges. |
 | `powershell/openfirewall.ps1` | Adds an inbound Windows Firewall rule named `Allow Tenable`. | Allows any protocol from remote address `10.0.0.8` on any profile. Adjust the remote address before running if your scanner or source host differs. |
 | `powershell/protocol_toggle.ps1` | Toggles SSL/TLS protocol support for secure or intentionally insecure lab states. | Set `$secureEnvironment = $true` to disable SSL 2.0, SSL 3.0, TLS 1.0, and TLS 1.1 while enabling TLS 1.2. Set it to `$false` to do the opposite for lab testing. Writes SCHANNEL registry keys and requires a reboot. |
+| `powershell/rdp_public_ip_restriction.ps1` | Restricts inbound RDP access to one prompted public IPv4 address. | Validates the entered IPv4 address, disables enabled inbound TCP/3389 allow rules, and creates one replacement allow rule scoped to that address. Requires Administrator privileges. It does not enable RDP or change its listening port. |
 | `powershell/teams_remove_tool.ps1` | Removes Microsoft Teams from Windows 11 systems and verifies cleanup. | Stops Teams processes, removes new Teams Appx/MSIX packages, removes provisioned packages, runs classic Teams uninstallers, deletes common leftover folders and shortcuts, then searches for remaining Teams executables. Requires Administrator privileges for full cleanup. |
 | `powershell/updated_libcurl.ps1` | Upgrades curl and Git with `winget`, then prints the installed curl version. | Runs `winget upgrade curl` and `winget upgrade Git.Git`, then executes `curl.exe --version`. Requires `winget` and internet access. |
 | `powershell/windows-update-toggle.ps1` | Enables or disables Windows Automatic Updates using policy and service settings. | Set `$Mode = "Off"` to set `NoAutoUpdate=1`, stop `wuauserv`, and disable the service. Set `$Mode = "On"` to remove the policy value, set the service to Manual, and start it. Includes verification output. Requires Administrator privileges. |
@@ -88,6 +89,7 @@ chmod +x scripts/bash/<script-name>.sh
 | Remove Microsoft Teams | `teams_remove_tool.ps1` |
 | Remove Wireshark | `wireshark_remove_tool.ps1` or `manage_toggles.ps1` |
 | Allow inbound ping from a known public IP | `allow_inbound_ping.ps1` |
+| Restrict inbound RDP to one public IP | `rdp_public_ip_restriction.ps1` |
 | Allow scanner traffic from a known internal IP | `openfirewall.ps1` |
 | Apply WinVerifyTrust padding mitigation | `certpadding_remedation.ps1` |
 | Upgrade curl and Git | `updated_libcurl.ps1` |
