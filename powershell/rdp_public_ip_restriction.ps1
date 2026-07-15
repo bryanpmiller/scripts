@@ -1,3 +1,33 @@
+<#
+.SYNOPSIS
+    Restricts inbound RDP access on TCP port 3389 to one public IPv4 address.
+    Please test thoroughly in a non-production environment before deploying widely.
+    Make sure to run as Administrator or with appropriate privileges.
+
+.NOTES
+    Author        : Bryan Miller
+    Date Created  : 2026-07-14
+    Last Modified : 2026-07-14
+    Version       : 1.0
+
+.TESTED ON
+    Date(s) Tested  : 2026-07-14
+    Tested By       : Automated PowerShell validation
+    Systems Tested  : No live Windows firewall changes tested
+    PowerShell Ver. : 5.1.26100.8655
+
+.EDITED BY
+    Date(s) Edited : 2026-07-14
+    Edited By      : Bryan Miller
+    Changes Made   : Added a comment-based help header for the RDP public-IP restriction script.
+    Tested         : Yes; syntax and address-validation tests passed. Live firewall changes were not performed.
+
+.USAGE
+    Run the script from an elevated PowerShell session. It prompts for the one public IPv4 address to allow.
+    Example syntax:
+    PS C:\\> .\\rdp_public_ip_restriction.ps1
+
+#>
 [CmdletBinding(SupportsShouldProcess)]
 param(
     [string]$PublicIp
